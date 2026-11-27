@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>商品ペアワイズ比較・ランキング</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>商品比較ランキング</h1>
+    <p class="subtitle">1対1の比較で迷わず順位決定（完全オフライン対応）</p>
+  </header>
+
+  <nav class="tab-nav" role="tablist">
+    <button class="tab-btn active" data-tab="compare" role="tab" aria-selected="true">比較する</button>
+    <button class="tab-btn" data-tab="ranking" role="tab" aria-selected="false">ランキング</button>
+    <button class="tab-btn" data-tab="items" role="tab" aria-selected="false">商品管理 (<span id="item-count-badge">0</span>)</button>
+    <button class="tab-btn" data-tab="data" role="tab" aria-selected="false">履歴・保存</button>
+  </nav>
+
+  <main class="container">
+    <!-- 1. 比較タブ -->
+    <section id="tab-compare" class="tab-panel active">
+      <div class="status-bar">
+        <span id="compare-progress-text">比較回数: 0回 / 全ペア網羅目安: 0回</span>
+        <button id="btn-next-pair" class="btn-secondary btn-sm" title="別の組み合わせを引く">別のペア</button>
+      </div>
+
+      <div id="compare-empty-state" class="empty-box hidden">
+        <p>比較するには商品を2つ以上登録してください。</p>
+        <button class="btn-primary" onclick="switchTab('items')">商品を登録する</button>
+      </div>
+
+      <div id="compare-arena" class="compare-arena hidden">
+        <p class="compare-prompt">どちらの商品がより魅力的・優先度が高いですか？</p>
+        <div class="cards-wrapper">
+          <article class="compare-card" id="card-left">
+            <div class="card-badge">左 (A)</div>
+            <h2 class="item-name" id="left-name">-</h2>
+            <div class="item-price" id="left-price">-</div>
+            <div class="item-category" id="left-category"></div>
+            <p class="item-memo" id="left-memo"></p>
+            <div class="item-stats" id="left-stats">比較: 0回</div>
+            <button id="btn-win-left" class="btn-choice btn-left">左が良い</button>
+          </article>
+
+          <div class="vs-divider">VS</div>
+
+          <article class="compare-card" id="card-right">
+            <div class="card-badge">右 (B)</div>
+            <h2 class="item-name" id="right-name">-</h2>
+            <div class="item-price" id="right-price">-</div>
+            <div class="item-category" id="right-category"></div>
+            <p class="item-memo" id="right-memo"></p>
+            <div class="item-stats" id="right-stats">比較: 0回</div>
+            <button id="btn-win-right" class="btn-choice btn-right">右が良い</button>
+          </article>
+        </div>
+
+        <div class="neutral-actions">
+          <button id="btn-draw" class="btn-neutral">同等（引き分け）</button>
+          <button id="btn-skip" class="btn-ghost">スキップ（今は決めない）</button>
+        </div>
+
+        <div id="last-action-banner" class="toast-inline hidden">
+          <span id="last-action-text">記録しました</span>
+          <button id="btn-undo" class="btn-link">1つ戻す</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. ランキングタブ -->
+    <section id="tab-ranking" class="tab-panel">
+      <div class="panel-header">
+        <h2>現在のランキング</h2>
+        <span class="model-tag">Bradley-Terry (MM法 + 事前分布)</span>
+      </div>
+
+      <div id="ranking-notice" class="info-banner hidden"></div>
+
+      <div id="ranking-empty-state" class="empty-box hidden">
+        <p>商品が登録されていません。</p>
+      </div>
+
+      <div class="table-wrapper" id="ranking-table-wrapper">
+        <table class="ranking-table">
+          <thead>
+            <tr>
+              <th>順位</th>
+              <th>商品名 / 価格</th>
+              <th>スコア<br><small>(勝率目安)</small></th>
+              <th>勝-負-分<br><small>(比較数)</small></th>
+              <th>信頼度</th>
+            </tr>
+          </thead>
+          <tbody id="ranking-tbody"></tbody>
+        </table>
+      </div>
+
+      <details class="algorithm-details">
+        <summary>ランキング算出アルゴリズムと注意点（Bradley-Terryモデル）</summary>
+        <div class="details-body">
+          <h4>採用理由</h4>
+          <p>単純な勝率では「強い相手とばかり戦った商品」が不利になり、Eloレーティングでは比較順序によって順位が変動します。Bradley-Terryモデルは全比較履歴から最尤推定（MMアルゴリズム）で強さパラメータを同時算出するため、<strong>比較順序に依存せず、循環（A&gt;B, B&gt;C, C&gt;A）があっても数学的に一意な最適解へ収束</strong>します。</p>
+          <h4>計算方法・同点・未比較の扱い</h4>
+          <ul>
+            <li><strong>強さ推定:</strong> 各商品 $i$ の強さ $\pi_i > 0$ を、$P(i \succ j) = rac{\pi_i}{\pi_i + \pi_j}$ に基づき反復計算します。表示スコアは平均的な仮想相手（$\pi=1$）に対する期待勝率 $rac{\pi_i}{\pi_i + 1} 	imes 100$（0〜100点、初期値50.0）です。</li>
+            <li><strong>同点の処理:</strong> 引き分け（同等）は双方に「0.5勝・0.5敗」として加算します（Davidson拡張の簡略等価形式）。</li>
+            <li><strong>未比較・少サンプル対策（ベイズ正則化）:</strong> 全勝・全敗でスコアが無限大に発散するのを防ぐため、各商品に「仮想の引き分け相手（$\pi_0=1$）との擬似対戦 $lpha=0.5$ 回分」の事前分布（MAP推定）を付与しています。未比較商品は初期値 <strong>50.0</strong> となり、「未比較」ラベルが表示されます。</li>
+          </ul>
+          <h4>モデルの仮定と限界</h4>
+          <ul>
+            <li><strong>推移律（一次元尺度）の仮定:</strong> すべての商品が1つの総合的価値軸で評価できると仮定しています。「価格はA、デザインはB」といった多基準の矛盾が多い場合、スコアは50付近に近づきます。</li>
+            <li><strong>不確実性:</strong> 比較回数が少ない段階（目安3回未満）は暫定順位です。「信頼度」列を確認しながら比較を増やしてください。</li>
+          </ul>
+        </div>
+      </details>
+    </section>
+
+    <!-- 3. 商品管理タブ -->
+    <section id="tab-items" class="tab-panel">
+      <div class="card-box">
+        <h2 id="form-title">新規商品の登録</h2>
+        <form id="item-form">
+          <input type="hidden" id="edit-item-id" value="">
+          <div class="form-row">
+            <label for="input-name">商品名 <span class="req">*</span></label>
+            <input type="text" id="input-name" placeholder="例: ワイヤレスノイズキャンセリングイヤホン A" required maxlength="80">
+          </div>
+          <div class="form-grid-2">
+            <div class="form-row">
+              <label for="input-price">価格（円・目安）</label>
+              <input type="number" id="input-price" placeholder="例: 24800" min="0" step="1">
+            </div>
+            <div class="form-row">
+              <label for="input-category">カテゴリ・メーカー</label>
+              <input type="text" id="input-category" placeholder="例: Sony / 家電" maxlength="40">
+            </div>
+          </div>
+          <div class="form-row">
+            <label for="input-memo">特徴・メモ（比較時に表示）</label>
+            <textarea id="input-memo" rows="2" placeholder="例: バッテリー30時間、軽量、マルチポイント対応" maxlength="300"></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn-primary" id="btn-save-item">登録する</button>
+            <button type="button" class="btn-secondary hidden" id="btn-cancel-edit">キャンセル</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel-header mt-2">
+        <h2>登録済み商品一覧</h2>
+        <button id="btn-load-sample" class="btn-secondary btn-sm">サンプル10件を追加</button>
+      </div>
+      <div id="items-list" class="items-list"></div>
+    </section>
+
+    <!-- 4. 履歴・保存タブ -->
+    <section id="tab-data" class="tab-panel">
+      <div class="card-box">
+        <h2>データのバックアップ・復元（JSON）</h2>
+        <p class="help-text">データはブラウザの <code>localStorage</code> に自動保存されます。機種変更やブラウザの履歴削除に備え、JSONファイルとして書き出し・復元できます。</p>
+        <div class="backup-actions">
+          <button id="btn-export-json" class="btn-primary">JSONをダウンロード</button>
+          <button id="btn-copy-json" class="btn-secondary">JSONをクリップボードにコピー</button>
+        </div>
+        <div class="import-area mt-1">
+          <label for="input-import-file" class="file-label">JSONファイルを選択して復元</label>
+          <input type="file" id="input-import-file" accept=".json,application/json">
+        </div>
+        <details class="mt-1">
+          <summary>テキスト貼り付けで復元（iPhone等でファイル選択が難しい場合）</summary>
+          <textarea id="textarea-import-json" rows="4" placeholder="ここにバックアップJSONを貼り付け"></textarea>
+          <button id="btn-import-text" class="btn-secondary btn-sm mt-1">貼り付けたJSONから復元</button>
+        </details>
+      </div>
+
+      <div class="card-box mt-2">
+        <div class="panel-header">
+          <h2>比較履歴（最新30件）</h2>
+          <button id="btn-clear-history" class="btn-danger btn-sm">履歴のみリセット</button>
+        </div>
+        <ul id="history-list" class="history-list"></ul>
+      </div>
+
+      <div class="card-box mt-2 danger-zone">
+        <h2>全データの初期化</h2>
+        <p class="help-text">登録した商品と比較履歴をすべて削除します。</p>
+        <button id="btn-reset-all" class="btn-danger">全データを削除する</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="ranking.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
