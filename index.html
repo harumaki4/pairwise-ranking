@@ -28,7 +28,7 @@
       </div>
 
       <div id="compare-empty-state" class="empty-box hidden">
-        <p>比較するには商品を2つ以上登録してください。</p>
+        <p>比較するには商品を2つ以上登録してください。「商品管理」タブから登録するか、一括追加をご利用ください。</p>
         <button class="btn-primary" onclick="switchTab('items')">商品を登録する</button>
       </div>
 
@@ -48,9 +48,13 @@
           <h3>自分で比較対象を指定する</h3>
           <p class="box-sub">左（A）と右（B）に並べたい商品を自由に選んで対戦できます。</p>
           <div class="manual-select-grid">
-            <select id="select-left-item" aria-label="左の商品を選択"></select>
+            <select id="select-left-item" aria-label="左の商品を選択">
+              <option value="">商品を2つ以上登録してください</option>
+            </select>
             <span class="select-vs">VS</span>
-            <select id="select-right-item" aria-label="右の商品を選択"></select>
+            <select id="select-right-item" aria-label="右の商品を選択">
+              <option value="">商品を2つ以上登録してください</option>
+            </select>
             <button type="button" id="btn-start-manual-pair" class="btn-secondary btn-sm">この2つで比較</button>
           </div>
         </div>
@@ -128,12 +132,12 @@
           <h4>計算方法・同点・未比較の扱い</h4>
           <ul>
             <li><strong>強さ推定:</strong> 各商品 $i$ の強さ $\pi_i > 0$ を、$P(i \succ j) = rac{\pi_i}{\pi_i + \pi_j}$ に基づき反復計算します。表示スコアは平均的な仮想相手（$\pi=1$）に対する期待勝率 $rac{\pi_i}{\pi_i + 1} 	imes 100$（0〜100点、初期値50.0）です。</li>
-            <li><strong>同点の処理:</strong> 引き分け（同等）は双方に「0.5勝・0.5敗」として加算します（Davidson拡張の簡略等価形式）。</li>
+            <li><strong>同点の処理:</strong> 引き分け（同等）は双方に「0.5勝・0.5敗」として加算します。</li>
             <li><strong>未比較・少サンプル対策（ベイズ正則化）:</strong> 全勝・全敗でスコアが無限大に発散するのを防ぐため、各商品に「仮想の引き分け相手（$\pi_0=1$）との擬似対戦 $lpha=0.5$ 回分」の事前分布（MAP推定）を付与しています。未比較商品は初期値 <strong>50.0</strong> となり、「未比較」ラベルが表示されます。</li>
           </ul>
           <h4>モデルの仮定と限界</h4>
           <ul>
-            <li><strong>推移律（一次元尺度）の仮定:</strong> すべての商品が1つの総合的価値軸で評価できると仮定しています。「価格はA、デザインはB」といった多基準の矛盾が多い場合、スコアは50付近に近づきます。</li>
+            <li><strong>推移律（一次元尺度）の仮定:</strong> すべての商品が1つの総合的価値軸で評価できると仮定しています。</li>
             <li><strong>不確実性:</strong> 比較回数が少ない段階（目安3回未満）は暫定順位です。「信頼度」列を確認しながら比較を増やしてください。</li>
           </ul>
         </div>
@@ -148,7 +152,7 @@
           <input type="hidden" id="edit-item-id" value="">
           <div class="form-row">
             <label for="input-name">商品名 <span class="req">*</span></label>
-            <input type="text" id="input-name" placeholder="例: ワイヤレスノイズキャンセリングイヤホン A" required maxlength="80">
+            <input type="text" id="input-name" placeholder="例: Polk Signature Elite ES10" required maxlength="80">
           </div>
           <div class="form-grid-2">
             <div class="form-row">
@@ -156,13 +160,13 @@
               <input type="number" id="input-price" placeholder="例: 24800" min="0" step="1">
             </div>
             <div class="form-row">
-              <label for="input-category">カテゴリ・メーカー</label>
-              <input type="text" id="input-category" placeholder="例: Sony / 家電" maxlength="40">
+              <label for="input-category">カテゴリ・グループ</label>
+              <input type="text" id="input-category" placeholder="例: デスクスピーカー / グループA" maxlength="40">
             </div>
           </div>
           <div class="form-row">
-            <label for="input-memo">特徴・メモ（比較時に表示）</label>
-            <textarea id="input-memo" rows="2" placeholder="例: バッテリー30時間、軽量、マルチポイント対応" maxlength="300"></textarea>
+            <label for="input-memo">特徴・スペックメモ（比較時に表示）</label>
+            <textarea id="input-memo" rows="2" placeholder="例: 80 Hz-40 kHz / 84 dB / 100 mm" maxlength="300"></textarea>
           </div>
           <div class="form-actions">
             <button type="submit" class="btn-primary" id="btn-save-item">登録する</button>
@@ -173,7 +177,10 @@
 
       <div class="panel-header mt-2">
         <h2>登録済み商品一覧</h2>
-        <button id="btn-load-sample" class="btn-secondary btn-sm">サンプル10件を追加</button>
+        <div class="bulk-actions">
+          <button type="button" id="btn-bulk-speakers" class="btn-primary btn-sm">デスクスピーカー一括追加 (12件)</button>
+          <button type="button" id="btn-load-sample" class="btn-secondary btn-sm">イヤホンサンプル10件を追加</button>
+        </div>
       </div>
       <div id="items-list" class="items-list"></div>
     </section>

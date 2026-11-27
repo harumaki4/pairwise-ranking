@@ -1,22 +1,96 @@
 /**
  * app.js
- * UI制御・状態管理・localStorage永続化・JSONバックアップ/復元
+ * UI制御・状態管理・localStorage永続化・JSONバックアップ/復元・PDFデータ一括追加
  */
 (function () {
   'use strict';
 
   const STORAGE_KEY = 'pairwise_product_ranking_v1';
 
-  // アプリ状態
+  // desk_speakers_grouped_specs (1).pdf に記載のスピーカー群（グループA〜D / 12機種）
+  const DESK_SPEAKER_BULK_ITEMS = [
+    {
+      name: 'Polk Signature Elite ES10',
+      price: null,
+      category: 'デスクスピーカー / グループA',
+      memo: '2.1/3.0系 / 80 Hz-40 kHz / 84 dB / 4-8Ω / 100 mm / 25 mm'
+    },
+    {
+      name: 'DALI SPEKTOR 1',
+      price: null,
+      category: 'デスクスピーカー / グループA',
+      memo: '4.8系 / 59 Hz-26 kHz / 83 dB / 6Ω / 114 mm / 21 mm'
+    },
+    {
+      name: 'DALI KUPID',
+      price: null,
+      category: 'デスクスピーカー / グループA',
+      memo: '4.9系 / 63 Hz-25 kHz / 83 dB / 4Ω / 114 mm / 26 mm'
+    },
+    {
+      name: 'Wharfedale DIAMOND 12.0i',
+      price: null,
+      category: 'デスクスピーカー / グループA',
+      memo: '70 Hz - 20 kHz / 87 dB / 4Ω / 100 mm / 25 mm'
+    },
+    {
+      name: 'DALI OPTICON 1 Mk2',
+      price: null,
+      category: 'デスクスピーカー / グループB',
+      memo: '11.9系 / 62 Hz-25 kHz / 85 dB / 4Ω / 120 mm / 29 mm'
+    },
+    {
+      name: 'DALI OBERON 1',
+      price: null,
+      category: 'デスクスピーカー / グループB',
+      memo: '5.9/7.5系 / 51 Hz-26 kHz / 86 dB / 6Ω / 133 mm / 29 mm'
+    },
+    {
+      name: 'DALI SONIK 1',
+      price: null,
+      category: 'デスクスピーカー / グループB',
+      memo: '6.7/9.0系 / 50 Hz-26 kHz / 86 dB / 6Ω / 130 mm / 29 mm'
+    },
+    {
+      name: 'B&W 607 S3',
+      price: null,
+      category: 'デスクスピーカー / グループB',
+      memo: '10.7/11.3系 / 52 Hz-28 kHz / 84 dB / 8Ω(3.0) / 130 mm / 25 mm'
+    },
+    {
+      name: 'DALI SPEKTOR 2',
+      price: null,
+      category: 'デスクスピーカー / グループB',
+      memo: '5.9系 / 54 Hz-26 kHz / 84.5 dB / 6Ω / 133 mm / 25 mm'
+    },
+    {
+      name: 'KEF Q1 Meta',
+      price: null,
+      category: 'デスクスピーカー / グループB',
+      memo: '7.9/8.8系 / 51 Hz-20 kHz / 86 dB / 4Ω(3.2) / 130 mm Uni-Q / 25 mm'
+    },
+    {
+      name: 'Polk Signature Elite ES15',
+      price: null,
+      category: 'デスクスピーカー / グループB',
+      memo: '4.6系 / 48 Hz - 40 kHz / 85 dB / 8Ω / 133 mm / 25 mm'
+    },
+    {
+      name: 'Wharfedale DIAMOND 12.1',
+      price: null,
+      category: 'デスクスピーカー / グループC',
+      memo: '5.0系 / 65 Hz-20 kHz / 88 dB / 4Ω / 130 mm / 25 mm'
+    }
+  ];
+
   let state = {
-    items: [],       // [{ id, name, price, category, memo, createdAt }]
-    comparisons: []  // [{ id, leftId, rightId, result, timestamp }]
+    items: [],
+    comparisons: []
   };
 
-  let currentPair = null; // { left, right }
+  let currentPair = null;
   let lastPairKey = null;
 
-  // --- ストレージ操作 ---
   function loadState() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -24,7 +98,6 @@
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.items) && Array.isArray(parsed.comparisons)) {
         state.items = parsed.items;
-        // 存在しない商品IDを参照する孤立履歴をクレンジング
         const validIds = new Set(state.items.map((item) => item.id));
         state.comparisons = parsed.comparisons.filter(
           (c) => validIds.has(c.leftId) && validIds.has(c.rightId) && c.leftId !== c.rightId
@@ -39,12 +112,11 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (err) {
-      alert('ブラウザへのデータ保存に失敗しました（容量超過またはプライベートブラウズ設定の可能性があります）。JSONバックアップを推奨します。');
+      alert('ブラウザへのデータ保存に失敗しました。JSONバックアップを推奨します。');
       console.error(err);
     }
   }
 
-  // --- ユーティリティ ---
   function generateId(prefix) {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
   }
@@ -70,7 +142,6 @@
       .replace(/'/g, '&#039;');
   }
 
-  // --- タブ切り替え ---
   window.switchTab = function (tabName) {
     document.querySelectorAll('.tab-btn').forEach((btn) => {
       const isTarget = btn.dataset.tab === tabName;
@@ -86,7 +157,6 @@
     if (tabName === 'items') renderItemsView();
     if (tabName === 'data') renderDataView();
   };
-
 
   function setManualPair(leftId, rightId) {
     if (!leftId || !rightId) return;
@@ -105,7 +175,22 @@
   function renderPairSelectors(validComparisons) {
     const leftSelect = document.getElementById('select-left-item');
     const rightSelect = document.getElementById('select-right-item');
+    const startBtn = document.getElementById('btn-start-manual-pair');
     if (!leftSelect || !rightSelect) return;
+
+    if (!state.items || state.items.length < 2) {
+      const emptyOpt = '<option value="">商品を2つ以上登録してください</option>';
+      leftSelect.innerHTML = emptyOpt;
+      rightSelect.innerHTML = emptyOpt;
+      leftSelect.disabled = true;
+      rightSelect.disabled = true;
+      if (startBtn) startBtn.disabled = true;
+      return;
+    }
+
+    leftSelect.disabled = false;
+    rightSelect.disabled = false;
+    if (startBtn) startBtn.disabled = false;
 
     const countById = new Map();
     validComparisons.forEach((c) => {
@@ -113,22 +198,27 @@
       countById.set(c.rightId, (countById.get(c.rightId) || 0) + 1);
     });
 
+    const prevLeft = leftSelect.value;
+    const prevRight = rightSelect.value;
+
     const optionsHtml = state.items
       .map((item) => {
         const cnt = countById.get(item.id) || 0;
-        return `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}（比較${cnt}回）</option>`;
+        const safeId = String(item.id || '').replace(/"/g, '&quot;');
+        return `<option value="${safeId}">${escapeHtml(item.name)}（比較${cnt}回）</option>`;
       })
       .join('');
 
     leftSelect.innerHTML = optionsHtml;
     rightSelect.innerHTML = optionsHtml;
 
-    if (currentPair) {
+    const validIdSet = new Set(state.items.map((it) => it.id));
+    if (currentPair && validIdSet.has(currentPair.left.id) && validIdSet.has(currentPair.right.id)) {
       leftSelect.value = currentPair.left.id;
       rightSelect.value = currentPair.right.id;
-    } else if (state.items.length >= 2) {
-      leftSelect.value = state.items[0].id;
-      rightSelect.value = state.items[1].id;
+    } else {
+      leftSelect.value = validIdSet.has(prevLeft) ? prevLeft : state.items[0].id;
+      rightSelect.value = validIdSet.has(prevRight) ? prevRight : state.items[1].id;
     }
   }
 
@@ -159,7 +249,6 @@
       .join('');
   }
 
-  // --- 比較画面の描画 ---
   function pickNextPair(forceDifferent = false) {
     if (state.items.length < 2) {
       currentPair = null;
@@ -197,7 +286,6 @@
     emptyEl.classList.add('hidden');
     arenaEl.classList.remove('hidden');
 
-    // currentPairが未設定または削除済み商品を含む場合は再選出
     const itemMap = new Map(state.items.map((item) => [item.id, item]));
     if (
       !currentPair ||
@@ -207,7 +295,6 @@
     ) {
       pickNextPair(false);
     } else {
-      // 商品情報が編集されている場合に備え最新オブジェクトに更新
       currentPair.left = itemMap.get(currentPair.left.id);
       currentPair.right = itemMap.get(currentPair.right.id);
     }
@@ -247,7 +334,7 @@
       id: generateId('cmp'),
       leftId: currentPair.left.id,
       rightId: currentPair.right.id,
-      result, // 'left' | 'right' | 'draw' | 'skip'
+      result,
       timestamp: new Date().toISOString()
     };
 
@@ -288,7 +375,6 @@
     renderCompareView();
   }
 
-  // --- ランキング画面の描画 ---
   function renderRankingView() {
     const emptyEl = document.getElementById('ranking-empty-state');
     const tableWrap = document.getElementById('ranking-table-wrapper');
@@ -343,7 +429,6 @@
       .join('');
   }
 
-  // --- 商品管理画面の描画 ---
   function updateBadge() {
     document.getElementById('item-count-badge').textContent = String(state.items.length);
   }
@@ -352,7 +437,7 @@
     updateBadge();
     const listEl = document.getElementById('items-list');
     if (state.items.length === 0) {
-      listEl.innerHTML = '<div class="empty-box"><p>まだ商品が登録されていません。上のフォームから追加するか、「サンプル10件を追加」をお試しください。</p></div>';
+      listEl.innerHTML = '<div class="empty-box"><p>まだ商品が登録されていません。フォームから追加するか、「デスクスピーカー一括追加 (12件)」をお試しください。</p></div>';
       return;
     }
 
@@ -449,7 +534,6 @@
     if (!confirm(msg)) return;
 
     state.items = state.items.filter((x) => x.id !== id);
-    // 関連する比較履歴を削除（孤立参照防止）
     state.comparisons = state.comparisons.filter((c) => c.leftId !== id && c.rightId !== id);
 
     if (currentPair && (currentPair.left.id === id || currentPair.right.id === id)) {
@@ -458,6 +542,38 @@
 
     saveState();
     renderItemsView();
+  }
+
+  function bulkAddItems(presetList, labelName) {
+    const existingNames = new Set(state.items.map((it) => it.name.trim().toLowerCase()));
+    let addedCount = 0;
+    let skippedCount = 0;
+
+    presetList.forEach((s) => {
+      const key = s.name.trim().toLowerCase();
+      if (existingNames.has(key)) {
+        skippedCount += 1;
+        return;
+      }
+      existingNames.add(key);
+      state.items.push({
+        id: generateId('itm'),
+        name: s.name,
+        price: s.price ?? null,
+        category: s.category || '',
+        memo: s.memo || '',
+        createdAt: new Date().toISOString()
+      });
+      addedCount += 1;
+    });
+
+    saveState();
+    renderItemsView();
+    alert(`${labelName}を ${addedCount}件 追加しました${skippedCount > 0 ? `（重複 ${skippedCount}件 はスキップ）` : ''}。`);
+  }
+
+  function addBulkDeskSpeakers() {
+    bulkAddItems(DESK_SPEAKER_BULK_ITEMS, 'デスクスピーカー');
   }
 
   function addSampleItems() {
@@ -473,23 +589,9 @@
       { name: 'Beats Studio Buds +', price: 24800, category: '完全ワイヤレス', memo: 'スケルトンデザイン、Apple/Android両対応のワンタッチ接続' },
       { name: 'Nothing Ear (a)', price: 14800, category: '完全ワイヤレス', memo: '独特のデザイン、軽量でコスパ優秀、ChatGPT連携' }
     ];
-
-    samples.forEach((s) => {
-      state.items.push({
-        id: generateId('itm'),
-        name: s.name,
-        price: s.price,
-        category: s.category,
-        memo: s.memo,
-        createdAt: new Date().toISOString()
-      });
-    });
-
-    saveState();
-    renderItemsView();
+    bulkAddItems(samples, 'イヤホンサンプル');
   }
 
-  // --- 履歴・バックアップ画面の描画 ---
   function renderDataView() {
     const listEl = document.getElementById('history-list');
     const itemMap = new Map(state.items.map((item) => [item.id, item.name]));
@@ -548,10 +650,10 @@
     const jsonStr = JSON.stringify(payload, null, 2);
     try {
       await navigator.clipboard.writeText(jsonStr);
-      alert('バックアップ用JSONをクリップボードにコピーしました。メモ帳などに貼り付けて保管できます。');
+      alert('バックアップ用JSONをクリップボードにコピーしました。');
     } catch (err) {
       document.getElementById('textarea-import-json').value = jsonStr;
-      alert('クリップボードへの直接コピーが制限されているため、下のテキスト欄に出力しました。全選択してコピーしてください。');
+      alert('下のテキスト欄にJSONを出力しました。全選択してコピーしてください。');
     }
   }
 
@@ -559,10 +661,9 @@
     try {
       const parsed = JSON.parse(jsonStr);
       if (!parsed || !Array.isArray(parsed.items) || !Array.isArray(parsed.comparisons)) {
-        throw new Error('JSONの形式が正しくありません（items / comparisons が見つかりません）。');
+        throw new Error('JSONの形式が正しくありません。');
       }
 
-      // 基本バリデーションとクレンジング
       const validItems = parsed.items
         .filter((it) => it && typeof it.id === 'string' && typeof it.name === 'string')
         .map((it) => ({
@@ -596,17 +697,14 @@
     }
   }
 
-  // --- イベント初期化 ---
   function init() {
     loadState();
     updateBadge();
 
-    // タブ切り替え
     document.querySelectorAll('.tab-btn').forEach((btn) => {
       btn.addEventListener('click', () => window.switchTab(btn.dataset.tab));
     });
 
-    // 比較ボタン
     document.getElementById('btn-win-left').addEventListener('click', () => recordComparison('left'));
     document.getElementById('btn-win-right').addEventListener('click', () => recordComparison('right'));
     document.getElementById('btn-draw').addEventListener('click', () => recordComparison('draw'));
@@ -629,9 +727,9 @@
       setManualPair(btn.dataset.leftId, btn.dataset.rightId);
     });
 
-    // 商品フォーム
     document.getElementById('item-form').addEventListener('submit', handleItemFormSubmit);
     document.getElementById('btn-cancel-edit').addEventListener('click', resetItemForm);
+    document.getElementById('btn-bulk-speakers').addEventListener('click', addBulkDeskSpeakers);
     document.getElementById('btn-load-sample').addEventListener('click', addSampleItems);
 
     document.getElementById('items-list').addEventListener('click', (e) => {
@@ -642,7 +740,6 @@
       if (action === 'delete') deleteItem(id);
     });
 
-    // バックアップ・復元・削除
     document.getElementById('btn-export-json').addEventListener('click', exportJsonData);
     document.getElementById('btn-copy-json').addEventListener('click', copyJsonToClipboard);
 
@@ -683,9 +780,13 @@
       renderDataView();
     });
 
-    // 初期表示
     renderCompareView();
+    renderItemsView();
   }
 
-  document.addEventListener('DOMContentLoaded', init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
