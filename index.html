@@ -33,6 +33,28 @@
       </div>
 
       <div id="compare-arena" class="compare-arena hidden">
+        <!-- 推奨・比較不足の対戦バトル -->
+        <div class="recommended-box">
+          <div class="recommended-header-row">
+            <h3>推奨・比較不足の対戦バトル</h3>
+            <span class="model-tag">自動抽出</span>
+          </div>
+          <p class="box-sub">未比較が多い商品やまだ戦っていない組み合わせを優先表示します。タップするとすぐ対戦できます。</p>
+          <div id="recommended-battles-list" class="recommended-list"></div>
+        </div>
+
+        <!-- ユーザーによる手動ペア指定 -->
+        <div class="manual-selector-box">
+          <h3>自分で比較対象を指定する</h3>
+          <p class="box-sub">左（A）と右（B）に並べたい商品を自由に選んで対戦できます。</p>
+          <div class="manual-select-grid">
+            <select id="select-left-item" aria-label="左の商品を選択"></select>
+            <span class="select-vs">VS</span>
+            <select id="select-right-item" aria-label="右の商品を選択"></select>
+            <button type="button" id="btn-start-manual-pair" class="btn-secondary btn-sm">この2つで比較</button>
+          </div>
+        </div>
+
         <p class="compare-prompt">どちらの商品がより魅力的・優先度が高いですか？</p>
         <div class="cards-wrapper">
           <article class="compare-card" id="card-left">

@@ -87,6 +87,78 @@
     if (tabName === 'data') renderDataView();
   };
 
+
+  function setManualPair(leftId, rightId) {
+    if (!leftId || !rightId) return;
+    if (leftId === rightId) {
+      alert('同じ商品同士は比較できません。別の商品を選んでください。');
+      return;
+    }
+    const itemMap = new Map(state.items.map((item) => [item.id, item]));
+    const left = itemMap.get(leftId);
+    const right = itemMap.get(rightId);
+    if (!left || !right) return;
+    currentPair = { left, right };
+    renderCompareView();
+  }
+
+  function renderPairSelectors(validComparisons) {
+    const leftSelect = document.getElementById('select-left-item');
+    const rightSelect = document.getElementById('select-right-item');
+    if (!leftSelect || !rightSelect) return;
+
+    const countById = new Map();
+    validComparisons.forEach((c) => {
+      countById.set(c.leftId, (countById.get(c.leftId) || 0) + 1);
+      countById.set(c.rightId, (countById.get(c.rightId) || 0) + 1);
+    });
+
+    const optionsHtml = state.items
+      .map((item) => {
+        const cnt = countById.get(item.id) || 0;
+        return `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}（比較${cnt}回）</option>`;
+      })
+      .join('');
+
+    leftSelect.innerHTML = optionsHtml;
+    rightSelect.innerHTML = optionsHtml;
+
+    if (currentPair) {
+      leftSelect.value = currentPair.left.id;
+      rightSelect.value = currentPair.right.id;
+    } else if (state.items.length >= 2) {
+      leftSelect.value = state.items[0].id;
+      rightSelect.value = state.items[1].id;
+    }
+  }
+
+  function renderRecommendedBattles(rankings) {
+    const container = document.getElementById('recommended-battles-list');
+    if (!container) return;
+
+    const recs = window.RankingEngine.getRecommendedBattles(state.items, state.comparisons, {
+      limit: 4,
+      currentRankings: rankings
+    });
+
+    if (recs.length === 0) {
+      container.innerHTML = '<p class="box-sub">推奨バトルを表示するには商品を2件以上登録してください。</p>';
+      return;
+    }
+
+    container.innerHTML = recs
+      .map(
+        (rec, idx) => `
+        <button type="button" class="rec-battle-btn" data-rec-index="${idx}" data-left-id="${escapeHtml(rec.left.id)}" data-right-id="${escapeHtml(rec.right.id)}">
+          <span class="rec-meta">${escapeHtml(rec.reason)}</span>
+          <span class="rec-matchup">${escapeHtml(rec.left.name)} <small>vs</small> ${escapeHtml(rec.right.name)}</span>
+          <span class="rec-sub">対戦履歴: ${rec.pairCount}回 / 最小比較数: ${rec.minCount}回</span>
+        </button>
+      `
+      )
+      .join('');
+  }
+
   // --- 比較画面の描画 ---
   function pickNextPair(forceDifferent = false) {
     if (state.items.length < 2) {
@@ -162,6 +234,10 @@
     document.getElementById('right-category').textContent = right.category || '';
     document.getElementById('right-memo').textContent = right.memo || '（メモなし）';
     document.getElementById('right-stats').textContent = `これまでの比較: ${countById.get(right.id) || 0}回`;
+
+    const rankings = window.RankingEngine.calculateBradleyTerry(state.items, state.comparisons);
+    renderPairSelectors(validComparisons);
+    renderRecommendedBattles(rankings);
   }
 
   function recordComparison(result) {
@@ -540,6 +616,18 @@
       renderCompareView();
     });
     document.getElementById('btn-undo').addEventListener('click', undoLastComparison);
+
+    document.getElementById('btn-start-manual-pair').addEventListener('click', () => {
+      const leftId = document.getElementById('select-left-item').value;
+      const rightId = document.getElementById('select-right-item').value;
+      setManualPair(leftId, rightId);
+    });
+
+    document.getElementById('recommended-battles-list').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-left-id][data-right-id]');
+      if (!btn) return;
+      setManualPair(btn.dataset.leftId, btn.dataset.rightId);
+    });
 
     // 商品フォーム
     document.getElementById('item-form').addEventListener('submit', handleItemFormSubmit);

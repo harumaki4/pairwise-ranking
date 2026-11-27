@@ -269,9 +269,92 @@
     }
   }
 
+
+  /**
+   * 比較が足りていない／推奨される対戦バトル候補を複数件抽出する
+   *
+   * @param {Array<Object>} items
+   * @param {Array<Object>} comparisons
+   * @param {Object} options - { limit: 4, currentRankings: Array|null }
+   * @returns {Array<Object>} [{ left, right, pairCount, minCount, sumCount, reason }]
+   */
+  function getRecommendedBattles(items, comparisons, options = {}) {
+    if (!items || items.length < 2) return [];
+    const limit = options.limit ?? 4;
+    const n = items.length;
+    const idToIndex = new Map();
+    items.forEach((item, idx) => idToIndex.set(item.id, idx));
+
+    const counts = new Int32Array(n);
+    const pairCount = new Map();
+    const makeKey = (id1, id2) => (id1 < id2 ? `${id1}::${id2}` : `${id2}::${id1}`);
+
+    for (const c of comparisons) {
+      if (c.result === 'skip') continue;
+      const i = idToIndex.get(c.leftId);
+      const j = idToIndex.get(c.rightId);
+      if (i === undefined || j === undefined || i === j) continue;
+      counts[i] += 1;
+      counts[j] += 1;
+      const key = makeKey(c.leftId, c.rightId);
+      pairCount.set(key, (pairCount.get(key) || 0) + 1);
+    }
+
+    const piMap = new Map();
+    if (options.currentRankings) {
+      options.currentRankings.forEach((r) => piMap.set(r.item.id, r.pi));
+    }
+
+    const scored = [];
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const a = items[i];
+        const b = items[j];
+        const key = makeKey(a.id, b.id);
+        const pCount = pairCount.get(key) || 0;
+        const minC = Math.min(counts[i], counts[j]);
+        const sumC = counts[i] + counts[j];
+        const piA = piMap.get(a.id) || 1.0;
+        const piB = piMap.get(b.id) || 1.0;
+        const skillDiff = Math.abs(Math.log(piA) - Math.log(piB));
+
+        const cost = pCount * 100 + minC * 15 + sumC * 4 + skillDiff * 1.5;
+
+        let reason = '比較バランス改善';
+        if (counts[i] === 0 && counts[j] === 0) {
+          reason = '両方とも未比較・初対戦';
+        } else if (minC === 0) {
+          reason = '未比較商品を含む優先バトル';
+        } else if (pCount === 0 && skillDiff < 0.35) {
+          reason = '未対戦×実力接近の注目カード';
+        } else if (pCount === 0) {
+          reason = 'まだ対戦していないペア';
+        } else if (minC <= 2) {
+          reason = '比較回数が少ない商品の補強';
+        } else if (skillDiff < 0.25) {
+          reason = 'スコア接近の接戦カード';
+        }
+
+        scored.push({
+          left: a,
+          right: b,
+          pairCount: pCount,
+          minCount: minC,
+          sumCount: sumC,
+          reason,
+          cost
+        });
+      }
+    }
+
+    scored.sort((x, y) => x.cost - y.cost);
+    return scored.slice(0, limit);
+  }
+
   const RankingEngine = {
     calculateBradleyTerry,
-    selectNextPair
+    selectNextPair,
+    getRecommendedBattles
   };
 
   if (typeof module !== 'undefined' && module.exports) {
